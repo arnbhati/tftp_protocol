@@ -1,0 +1,24 @@
+# depslib dependency file v1.0
+1392213499 source:/home/bhati/Documents/assign2/main.cpp
+	<iostream>
+	<vector>
+	<cstdio>
+	<cstdlib>
+	<cstring>
+	<netdb.h>
+	<sys/socket.h>
+	<sys/types.h>
+	<netinet/in.h>
+
+1392372138 source:/home/bhati/Documents/assign2/tftp_client.cpp
+	<iostream>
+	<vector>
+	<cstdio>
+	<cstdlib>
+	<cstring>
+	<string>
+	<netdb.h>
+	<sys/socket.h>
+	<sys/types.h>
+	<netinet/in.h>
+
