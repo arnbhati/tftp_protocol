@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1392390918 source:/home/bhati/Documents/tftp/tftp_client.cpp
+1392809122 source:/home/bhati/Documents/tftp/tftp_client.cpp
 	<iostream>
 	<fstream>
 	<vector>
@@ -8,7 +8,10 @@
 	<cstring>
 	<string>
 	<netdb.h>
+	<iostream>
+	<fstream>
 	<sys/socket.h>
 	<sys/types.h>
 	<netinet/in.h>
+	<sys/poll.h>
 
