@@ -23,20 +23,24 @@ using namespace std ;
 #define MAX_SIZE 1000024
 
 // global variable
+
+
 string output_buffer ;
 int socket_id , bind_id , seraddr_len , poll_count , poll_break ;
-int packet_len , packet_count , packet_cur_size , fbytes, sbytes , charcount ;
+int packet_len , packet_cur_size , fbytes, sbytes , charcount ;
+unsigned short int packet_count ;
 char packet_buffer[MAX_SIZE] ;
-const string mode = "octet" ;
+const string mode = "netascii" ;
 struct hostent *hp ;
 struct sockaddr_in myaddr , seraddr;
 struct pollfd ufds ;
 bool last_packet ;
 char host[500] ;
 ofstream myfile ;
-void print_error(int i) ;
+void print_error(unsigned short int i) ;
 bool Fill_buffer(string inputfile) ;
 string CONN_ERROR = "problem in sending data to server try after some time" ;
+
 
 void conn_start()
 {
@@ -73,8 +77,8 @@ bool read_request(string FileName)
 {
     packet_count = 0 ;
     packet_len = 2 ;
-    packet_buffer[0] = '\0' ;
-    packet_buffer[1] = RRQ + '\0' ;
+
+    *((unsigned short *)&packet_buffer[0]) = htons(RRQ) ;
 
     for(int i=0;i<FileName.length();i++,packet_len++)
     {
@@ -94,7 +98,7 @@ bool read_request(string FileName)
         cout << "Unable to Send Read Request Resending..." << endl  ;
         return false ;
     }
-    cout << "Read Request send to server for file name =" << FileName << endl  ;
+    cout << "Read Request send to server for file name = " << FileName << endl  ;
     return true ;
 }
 
@@ -132,6 +136,7 @@ bool get_data()
             return true ;
         }
         int retsize = recvfrom(socket_id, packet_buffer, MAX_SIZE , 0, (sockaddr*) &seraddr, (socklen_t *)&seraddr_len);
+
         if(retsize == -1)
         {
             cout << "\nRecv Error : " ;
@@ -139,22 +144,21 @@ bool get_data()
             return true ;
         }
         charcount = 0 ;
-        fbytes = (int)packet_buffer[0] ;
-        sbytes = (int)packet_buffer[1] ;
+
+        unsigned short int sbytes = ntohs(*((unsigned short *)&packet_buffer[0]));
+
         if(sbytes==3)
         {
-            fbytes = (int)packet_buffer[2] ;
-            sbytes = (int)packet_buffer[3] ;
-            sbytes = sbytes + ( fbytes << 8 ) ;
-            if(sbytes == packet_count+1)
+            sbytes = ntohs(*((unsigned short *)&packet_buffer[2]));
+            if(sbytes == (unsigned short int)(packet_count+1))
             {
                 cout << endl << endl << "*** Packet No. "<< sbytes << " of size = " << retsize - 4 << " bytes is Recieved ***" << endl << endl ;
                 packet_count++ ;
 
-                for(int i=2;i<retsize;i++,charcount++)
+                for(int i=4;i<retsize;i++,charcount++)
                 {
                     myfile << packet_buffer[i] ;
-                    cout << packet_buffer[i]  ;
+                   // cout << packet_buffer[i]  ;
                 }
                 if(retsize-4 < 512)
                 return false ;
@@ -165,9 +169,7 @@ bool get_data()
             return true ;
         }else
         {
-            fbytes = (int)packet_buffer[2] ;
-            sbytes = (int)packet_buffer[3] ;
-            sbytes = sbytes + ( fbytes << 8 ) ;
+            sbytes = ntohs(*((unsigned short *)&packet_buffer[2]));
             print_error(sbytes) ;
             poll_break = 1 ;
             return false ;
@@ -177,13 +179,19 @@ bool get_data()
 
 bool send_ack()
 {
-    int temp = packet_count ;
+    //int temp = packet_count ;
     packet_len = 4 ;
-    packet_buffer[0] = '\0' ;
-    packet_buffer[1] = ACK + '\0' ;
-    packet_buffer[3] = '\0' + (temp & 255) ;
-    temp = temp >> 8 ;
-    packet_buffer[2] = '\0' + (temp & 255) ;
+    /*packet_buffer[0] = '\0' ;
+    packet_buffer[1] = ACK + '\0' ;*/
+    *((unsigned short *)&packet_buffer[0]) = htons(ACK) ;
+   // unsigned short int sbytes = ntohs(*((unsigned short *)&packet[0]));
+
+    *((unsigned short *)&packet_buffer[2]) = htons(packet_count) ;
+    //packet_buffer[3] = '\0' + (temp & 255) ;
+
+    //temp = temp >> 8 ;
+    //packet_buffer[2] = '\0' + (temp & 255) ;
+
     if(sendto(socket_id, packet_buffer, packet_len, 0 , (struct sockaddr *)&seraddr, sizeof(seraddr))==-1)
     {
         cout << "Unable to send acknoledge Resending..." << endl ;
@@ -195,11 +203,12 @@ bool send_ack()
 
 bool write_request(string FileName)
 {
-    packet_count = 0 ;
+
     packet_len = 2 ;
-    packet_buffer[0] = '\0' ;
-    packet_buffer[1] = WRQ + '\0' ;
-    charcount = 0 ;
+    charcount = packet_count = 0 ;
+
+    *((unsigned short *)&packet_buffer[0]) = htons(WRQ) ;
+
 
     for(int i=0;i<FileName.length();i++,packet_len++)
     {
@@ -218,7 +227,7 @@ bool write_request(string FileName)
         cout << "Unable to Send Write Request Resending..." << endl  ;
         return false ;
     }
-    cout << "Write Request send to server for file name =" << FileName << endl  ;
+    cout << "Write Request send to server for file name = " << FileName << endl  ;
     return true ;
 }
 
@@ -266,13 +275,12 @@ bool get_ack()
         cout << "\nRecv Error : " ;
         return false ;
     }
-    fbytes = (int)packet_buffer[0] ;
-    sbytes = (int)packet_buffer[1] ;
+
+    unsigned short int sbytes = ntohs(*((unsigned short *)&packet_buffer[0]));
+
     if(sbytes==4)
     {
-        fbytes = (int)packet_buffer[2] ;
-        sbytes = (int)packet_buffer[3] ;
-        sbytes = sbytes + ( fbytes << 8 ) ;
+        unsigned short int sbytes = ntohs(*((unsigned short *)&packet_buffer[2]));
         if(sbytes == packet_count)
         {
             cout << endl << endl << "*** Packet No. "<< sbytes << " is Ackhnoledged ***" << endl << endl ;
@@ -283,9 +291,7 @@ bool get_ack()
 
     }else if(sbytes==5)
     {
-        fbytes = (int)packet_buffer[2] ;
-        sbytes = (int)packet_buffer[3] ;
-        sbytes = sbytes + ( fbytes << 8 ) ;
+        unsigned short int sbytes = ntohs(*((unsigned short *)&packet_buffer[2]));
         print_error(sbytes) ;
         poll_break = 1 ;
         return false ;
@@ -299,19 +305,17 @@ bool get_ack()
 
 bool send_data(bool got_ack)
 {
-    int temp ;
+    int temp , count = 0 , i ;
     packet_len = 4 ;
-    packet_buffer[0] = '\0' ;
-    packet_buffer[1] = DATA + '\0' ;
+
+    *((unsigned short *)&packet_buffer[0]) = htons(DATA) ;
+
     if(got_ack)
     {
         packet_count++ ;
-        temp = packet_count ;
-        packet_buffer[3] = '\0' + (temp & 255) ;
-        temp = temp >> 8 ;
-        packet_buffer[2] = '\0' + (temp & 255) ;
-        int count = 1 ;
-        int i ;
+
+        *((unsigned short *)&packet_buffer[2]) = htons(packet_count) ;
+
         for(i = charcount ; i<output_buffer.length() && count <= 512 ; i++ , charcount++ , packet_len++ , count++)
         {
             packet_buffer[packet_len] = output_buffer[i] ;
@@ -325,15 +329,14 @@ bool send_data(bool got_ack)
             last_packet = true ;
         return true ;
     }
-    temp = packet_count ;
-    packet_buffer[3] = '\0' + (temp & 255) ;
-    temp = temp >> 8 ;
-    packet_buffer[2] = '\0' + (temp & 255) ;
-    int count = 1 ;
+
+    *((unsigned short *)&packet_buffer[2]) = htons(packet_count) ;
+
     if(charcount-512 < 0)
         charcount = 0 ;
     else
         charcount -= 512 ;
+
     for(int i = charcount ; i<output_buffer.length() && count <= 512 ; i++ , charcount++ , packet_len++ , count++)
     {
         packet_buffer[packet_len] = output_buffer[i] ;
@@ -343,6 +346,9 @@ bool send_data(bool got_ack)
         cout << "Unable to send data Resending..." << endl ;
         return false ;
     }
+    if(count < 512 && i >= output_buffer.length())
+            last_packet = true ;
+
     return true ;
 }
 
@@ -353,8 +359,6 @@ int main(int argc, char* argv[])
 {
     bool got_ack , flag ;
     int i , count ;
-
-
 
     string FileName,FileName1 ;
     strcpy(host,"localhost") ;
@@ -520,7 +524,7 @@ bool Fill_buffer(string inputfile)
 }
 
 
-void print_error(int i)
+void print_error(unsigned short int i)
 {
     switch(i)
     {
